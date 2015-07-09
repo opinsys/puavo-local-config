@@ -19,7 +19,8 @@ require 'syslog'
 
 Encoding.default_external = 'utf-8'
 
-Ltspadmins_group_id = 3000
+Puavolocaladmin_user_id   = 3000
+Puavolocaladmins_group_id = 3000
 
 class NetworkError < RuntimeError; end
 
@@ -150,14 +151,22 @@ def configure_admins()
 
   kernel_cmdline = IO.read('/proc/cmdline')
 
-  new_line = "puavolocaladmins:x:#{ Ltspadmins_group_id }:#{ admin }"
-  search_and_replace_line('/etc/group',
-                         /^puavolocaladmins:/,
-                         new_line)
+  new_passwd_line \
+    = "puavolocaladmin:x:#{ Puavolocaladmin_user_id }" \
+        + ":#{ Puavolocaladmins_group_id }::/nonexistent:/bin/false"
 
+  search_and_replace_line('/etc/passwd', /^puavolocaladmin:/, new_passwd_line)
+  search_and_replace_line('/etc/shadow',
+                          /^puavolocaladmin:/,
+                          'puavolocaladmin:!:::::::')
+
+  new_group_line = "puavolocaladmins:x:#{ Puavolocaladmins_group_id }" \
+                     + ":puavolocaladmin,#{ admin }"
+
+  search_and_replace_line('/etc/group', /^puavolocaladmins:/, new_group_line)
   search_and_replace_line('/etc/gshadow',
                          /^puavolocaladmins:/,
-                         "puavolocaladmins:!::#{ admin }")
+                         "puavolocaladmins:!::puavolocaladmin,#{ admin }")
 
   File.open('/etc/sudoers.d/puavolocaladmins.pcltmp', 'w') do |f|
     if superlaptop_mode? then
@@ -409,7 +418,7 @@ end
 config_path_dir = File.dirname(config_path)
 FileUtils.mkdir_p(config_path_dir)
 FileUtils.chmod(02770, config_path_dir)
-FileUtils.chown(0, Ltspadmins_group_id, config_path_dir)
+FileUtils.chown(0, Puavolocaladmins_group_id, config_path_dir)
 
 begin
   conf = JSON.parse( IO.read(config_path) )
